@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	_ "github.com/lib/pq"
@@ -12,17 +13,6 @@ import (
 
 
 const (
-	// dbHost         = "172.16.2.52"
-	// dbPort         = 5432
-	// dbUser         = "app"
-	// dbPassword     = "U9oe7rumHcmph2ypF0fnQwXjcmSshbEKGam9oEQsFC0BpwX45bP6EB7tEfwFpDqG"
-	// dbName         = "ekuid-staging"
-	// 
-	dbHost         = "localhost"
-	dbPort         = 5432
-	dbUser         = "go_user"
-	dbPassword     = "password123"
-	dbName         = "go_login"
 	sslMode        = "disable"
 	maxAttempts    = 3
 	retryDelay     = 5 * time.Second
@@ -31,18 +21,30 @@ const (
 	connMaxLife    = 2 * time.Hour
 )
 
-// buildConnStr constructs the PostgreSQL connection string
-func buildConnStr() string {
+// buildConnStr constructs the PostgreSQL connection string from environment variables
+func buildConnStr() (string, error) {
+	dbHost := os.Getenv("DB_STAG_HOST")
+	dbPort := os.Getenv("DB_STAG_PORT")
+	dbUser := os.Getenv("DB_STAG_USER")
+	dbPassword := os.Getenv("DB_STAG_PASS")
+	dbName := os.Getenv("DB_STAG_NAME")
+
+	if dbHost == "" || dbPort == "" || dbUser == "" || dbPassword == "" || dbName == "" {
+		return "", errors.New("missing required environment variables for database connection")
+	}
+
 	return fmt.Sprintf(
-		"host=%s port=%d user=%s password=%s dbname=%s sslmode=%s",
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		dbHost, dbPort, dbUser, dbPassword, dbName, sslMode,
-	)
+	), nil
 }
 
 // Connect initializes the DB connection with retry logic and pooling config
 func Connect() error {
-	connStr := buildConnStr()
-	var err error
+	connStr, err := buildConnStr()
+	if err != nil {
+		return err
+	}
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		DB, err = sql.Open("postgres", connStr)

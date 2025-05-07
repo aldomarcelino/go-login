@@ -1,16 +1,18 @@
 package models
 
+import (
+	"database/sql"
+	"github.com/google/uuid"
+)
+
 type User struct {
-	ID       int    `json:"id"`
-	Username string `json:"username"`
-	Password string `json:"password"`
+	ID          uuid.UUID
+	EmailHash   uint32
+	Password    string
+	SSOID       *string
+	UserType    sql.NullString
+	UserToken   sql.NullString
+	FirstName   sql.NullString
+	LastName    sql.NullString
+	PhoneNumber sql.NullString
 }
-
-
-type LoginInput struct {
-	Username string `json:"username"`
-	Password string `json:"password"`
-}
-
-
-

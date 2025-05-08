@@ -1,25 +1,25 @@
 package config
 
 import (
-	"database/sql"
 	"errors"
 	"fmt"
 	"log"
 	"os"
 	"time"
 
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
-
 const (
-	sslMode        = "disable"
-	maxAttempts    = 3
-	retryDelay     = 5 * time.Second
-	maxOpenConns   = 25
-	maxIdleConns   = 25
-	connMaxLife    = 2 * time.Hour
+	sslMode      = "disable"
+	maxAttempts  = 3
+	retryDelay   = 5 * time.Second
+	maxOpenConns = 25
+	maxIdleConns = 25
+	connMaxLife  = 2 * time.Hour
 )
+
 
 // buildConnStr constructs the PostgreSQL connection string from environment variables
 func buildConnStr() (string, error) {
@@ -39,7 +39,7 @@ func buildConnStr() (string, error) {
 	), nil
 }
 
-// Connect initializes the DB connection with retry logic and pooling config
+// Connect initializes the DB connection using sqlx with retry and pooling configuration
 func Connect() error {
 	connStr, err := buildConnStr()
 	if err != nil {
@@ -47,21 +47,16 @@ func Connect() error {
 	}
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		DB, err = sql.Open("postgres", connStr)
-		if err != nil {
-			log.Printf("[DB] Attempt %d: failed to open connection: %v", attempt, err)
-			time.Sleep(retryDelay)
-			continue
-		}
-
-		if err = DB.Ping(); err == nil {
+		var db *sqlx.DB
+		db, err = sqlx.Connect("postgres", connStr)
+		if err == nil {
 			log.Println("[DB] Connection established.")
-			configureConnectionPool(DB)
+			configureConnectionPool(db)
+			DB = db
 			return nil
 		}
 
-		log.Printf("[DB] Attempt %d: failed to ping database: %v", attempt, err)
-		DB.Close()
+		log.Printf("[DB] Attempt %d: failed to connect: %v", attempt, err)
 		time.Sleep(retryDelay)
 	}
 
@@ -69,7 +64,7 @@ func Connect() error {
 }
 
 // configureConnectionPool sets connection pooling parameters
-func configureConnectionPool(db *sql.DB) {
+func configureConnectionPool(db *sqlx.DB) {
 	db.SetMaxOpenConns(maxOpenConns)
 	db.SetMaxIdleConns(maxIdleConns)
 	db.SetConnMaxLifetime(connMaxLife)

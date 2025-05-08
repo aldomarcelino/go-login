@@ -1,9 +1,8 @@
 package services
 
 import (
-	"database/sql"
+	"errors"
 	"hash/crc32"
-	"log"
 	"strings"
 
 	"github.com/google/uuid"
@@ -13,40 +12,62 @@ import (
 	"go-login-api/models"
 )
 
+
+
 func AuthenticateUser(req *models.LoginRequest) (*models.User, error) {
 	var user models.User
-	var err error
 
 	if req.SSOID != nil {
-		err = config.DB.QueryRow("SELECT id, email_hash, user_type, user_token, first_name, last_name, phone_number FROM users WHERE sso_id = $1", *req.SSOID).
-			Scan(&user.ID, &user.EmailHash, &user.UserType, &user.UserToken, &user.FirstName, &user.LastName, &user.PhoneNumber)
-	} else if req.Email != nil && req.Password != nil {
+		query := `
+			SELECT id, email_hash, user_type, user_token, first_name, last_name, phone_number 
+			FROM users 
+			WHERE sso_id = $1`
+		err := config.DB.Get(&user, query, *req.SSOID)
+		if err != nil {
+			return nil, err
+		}
+		return &user, nil
+	}
+
+	if req.Email != nil && req.Password != nil {
 		email := strings.ToLower(*req.Email)
 		emailHash := crc32.ChecksumIEEE([]byte(email))
 
-		log.Println("Email:", *req.Email)
-		log.Println("Email Hash:", emailHash)
+		query := `
+			SELECT id, email_hash, password, user_type, user_token, first_name, last_name, phone_number 
+			FROM users 
+			WHERE email_hash = $1`
+		err := config.DB.Get(&user, query, emailHash)
+		if err != nil {
+			return nil, err
+		}
 
-		err = config.DB.QueryRow(`SELECT id, email_hash, password, user_type, user_token, first_name, last_name, phone_number 
-		                   FROM users WHERE email_hash = $1`, emailHash).
-			Scan(&user.ID, &user.EmailHash, &user.Password, &user.UserType, &user.UserToken, &user.FirstName, &user.LastName, &user.PhoneNumber)
-
-		if err == nil && bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.Password)) != nil {
+		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.Password)) != nil {
 			return nil, bcrypt.ErrMismatchedHashAndPassword
 		}
-	} else {
-		return nil, sql.ErrNoRows
+		return &user, nil
 	}
 
-	return &user, err
+	return nil, errors.New("invalid login credentials")
 }
 
 func CreateSession(userID uuid.UUID, accessToken, refreshToken string, device, macAddress *string) (string, error) {
 	sessionID := uuid.New().String()
-	_, err := config.DB.Exec(`INSERT INTO sessions 
-	                  (id, user_id, access_token, refresh_token, device, mac_address, active) 
-	                  VALUES ($1, $2, $3, $4, $5, $6, true)`,
-		sessionID, userID, accessToken, refreshToken, device, macAddress)
+
+	query := `
+		INSERT INTO sessions 
+		(id, user_id, access_token, refresh_token, device, mac_address, active) 
+		VALUES (:id, :user_id, :access_token, :refresh_token, :device, :mac_address, true)`
+
+	_, err := config.DB.NamedExec(query, map[string]interface{}{
+		"id":            sessionID,
+		"user_id":       userID,
+		"access_token":  accessToken,
+		"refresh_token": refreshToken,
+		"device":        device,
+		"mac_address":   macAddress,
+	})
+
 	return sessionID, err
 }
 

@@ -13,17 +13,35 @@ import (
 )
 
 func GenerateAccessToken(user *models.User) (string, error) {
-	decryptedFirstName := utils.DecryptMock(user.FirstName.String)
-	decryptedLastName := utils.DecryptMock(user.LastName.String)
-	decryptedPhoneNumber := utils.DecryptMock(user.PhoneNumber.String)
+	firstName := ""
+	lastName := ""
+	phoneNumber := ""
+	userType := ""
+	userToken := ""
+
+	if user.FirstName.Valid {
+		firstName = utils.DecryptMock(user.FirstName.String)
+	}
+	if user.LastName.Valid {
+		lastName = utils.DecryptMock(user.LastName.String)
+	}
+	if user.PhoneNumber.Valid {
+		phoneNumber = utils.DecryptMock(user.PhoneNumber.String)
+	}
+	if user.UserType.Valid {
+		userType = user.UserType.String
+	}
+	if user.UserToken.Valid {
+		userToken = user.UserToken.String
+	}
 
 	tokenPayload := jwt.MapClaims{
 		"user_id":      user.ID.String(),
-		"user_type":    user.UserType.String,
-		"user_token":   user.UserToken.String,
-		"first_name":   decryptedFirstName,
-		"last_name":    decryptedLastName,
-		"phone_number": decryptedPhoneNumber,
+		"user_type":    userType,
+		"user_token":   userToken,
+		"first_name":   firstName,
+		"last_name":    lastName,
+		"phone_number": phoneNumber,
 		"exp":          time.Now().Add(15 * time.Minute).Unix(),
 		"iss":          config.JWTIssuer,
 	}

@@ -1,15 +1,15 @@
 package config
 
 import (
-	"database/sql"
 	"log"
 
 	"github.com/go-redis/redis/v8"
+	"github.com/jmoiron/sqlx"
 	_ "github.com/lib/pq"
 )
 
 var (
-	DB          *sql.DB
+	DB          *sqlx.DB
 	RedisClient *redis.Client
 	JWTSecret   = []byte("aldobareto01")
 	JWTIssuer   = "go-login-api"
@@ -17,15 +17,12 @@ var (
 
 func InitializeDB(connStr string) {
 	var err error
-	DB, err = sql.Open("postgres", connStr)
+	DB, err = sqlx.Connect("postgres", connStr)
 	if err != nil {
 		log.Fatal("Failed to connect to database:", err)
 	}
-
-	if err := DB.Ping(); err != nil {
-		log.Fatal("Failed to ping database:", err)
-	}
 }
+
 
 func InitializeRedis() {
 	RedisClient = redis.NewClient(&redis.Options{

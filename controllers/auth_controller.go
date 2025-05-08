@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
 	"go-login-api/models"
@@ -35,30 +36,37 @@ func LoginHandler(c *gin.Context) {
 		return
 	}
 
-	rawRefresh, hashedRefresh, err := services.GenerateRefreshToken()
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate refresh token"})
-		return
-	}
+	refreshToken := uuid.New().String()
 
 	if err := services.DeactivatePreviousSessions(user.ID); err != nil {
 		log.Println("Failed to deactivate previous sessions:", err)
 	}
 
-	sessionID, err := services.CreateSession(user.ID, accessToken, hashedRefresh, req.Device, req.MacAddress)
+	// user.ID, accessToken, hashedRefresh, req.Device, req.MacAddress
+	sessionID, err := services.CreateSession(models.Session{
+		ID:            uuid.New().String(),
+		UserID:        user.ID,
+		ClientVersion: c.GetHeader("x-client-version"),
+		Device:        *req.Device,
+		MacAddress:    *req.MacAddress,
+		PublicKey:     *req.PublicKey,
+		IP:            c.RemoteIP(),
+		Active:        true,
+		UserAgent:     c.Request.UserAgent(),
+	})
 	if err != nil {
 		log.Println("Insert session error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to create session"})
 		return
 	}
 
-	if err := services.StoreTokenPairInRedis(user.ID.String(), accessToken, rawRefresh); err != nil {
+	if err := services.StoreTokenPairInRedis(user.ID, accessToken, refreshToken); err != nil {
 		log.Println("Failed to store token pair in Redis:", err)
 	}
 
 	c.JSON(http.StatusOK, models.LoginResponse{
 		SessionID:    sessionID,
 		AccessToken:  accessToken,
-		RefreshToken: rawRefresh,
+		RefreshToken: refreshToken,
 	})
 }

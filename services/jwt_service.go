@@ -19,20 +19,20 @@ func GenerateAccessToken(user *models.User) (string, error) {
 	userType := ""
 	userToken := ""
 
-	if user.FirstName.Valid {
-		firstName = utils.DecryptMock(user.FirstName.String)
+	if user.FirstName!=nil {
+		firstName = utils.DecryptMock(*user.FirstName)
 	}
-	if user.LastName.Valid {
-		lastName = utils.DecryptMock(user.LastName.String)
+	if user.LastName!=nil {
+		lastName = utils.DecryptMock(*user.LastName)
 	}
-	if user.PhoneNumber.Valid {
-		phoneNumber = utils.DecryptMock(user.PhoneNumber.String)
+	if user.PhoneNumber!=nil {
+		phoneNumber = utils.DecryptMock(*user.PhoneNumber)
 	}
-	if user.UserType.Valid {
-		userType = user.UserType.String
+	if user.UserType!=nil {
+		userType = *user.UserType
 	}
-	if user.UserToken.Valid {
-		userToken = user.UserToken.String
+	if user.UserToken!=nil {
+		userToken = *user.UserToken
 	}
 
 	tokenPayload := jwt.MapClaims{

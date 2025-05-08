@@ -1,10 +1,12 @@
 package services
 
 import (
+	"crypto/sha512"
+	"encoding/hex"
 	"errors"
-	"hash/crc32"
 	"strings"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
@@ -12,6 +14,12 @@ import (
 	"go-login-api/models"
 )
 
+
+func cryptoHash(inputString string) string {
+    hasher := sha512.New()
+    hasher.Write([]byte(inputString))
+    return hex.EncodeToString(hasher.Sum(nil))
+}
 
 
 func AuthenticateUser(req *models.LoginRequest) (*models.User, error) {
@@ -26,25 +34,32 @@ func AuthenticateUser(req *models.LoginRequest) (*models.User, error) {
 		if err != nil {
 			return nil, err
 		}
+
+		
+
 		return &user, nil
 	}
 
 	if req.Email != nil && req.Password != nil {
 		email := strings.ToLower(*req.Email)
-		emailHash := crc32.ChecksumIEEE([]byte(email))
+		emailHash := cryptoHash(email)
 
 		query := `
 			SELECT id, email_hash, password, user_type, user_token, first_name, last_name, phone_number 
-			FROM users 
+			FROM Users 
 			WHERE email_hash = $1`
+		// query := `SELECT * FROM users limit 1`
 		err := config.DB.Get(&user, query, emailHash)
 		if err != nil {
 			return nil, err
 		}
 
-		if bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(*req.Password)) != nil {
+		if bcrypt.CompareHashAndPassword([]byte(*user.Password), []byte(*req.Password)) != nil {
 			return nil, bcrypt.ErrMismatchedHashAndPassword
 		}
+
+		spew.Dump(user)
+		
 		return &user, nil
 	}
 
